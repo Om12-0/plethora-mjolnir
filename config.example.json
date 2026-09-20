@@ -1,0 +1,88 @@
+{
+  "roots": [
+    "C:\\Users\\<you>\\Documents",
+    "C:\\Users\\<you>\\Desktop"
+  ],
+  "extensions": [
+    ".pdf", ".docx", ".txt", ".md", ".rtf",
+    ".py", ".ipynb", ".sql", ".java", ".c", ".h", ".cpp", ".hpp", ".cs",
+    ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".rb", ".php", ".r",
+    ".html", ".css", ".scss", ".yaml", ".yml", ".toml", ".ini",
+    ".json", ".csv", ".tex", ".sh", ".ps1", ".bat"
+  ],
+  "excludes": [
+    ".git", ".svn", ".hg", "node_modules", "__pycache__", ".venv", "venv",
+    "env", ".idea", ".vscode", "dist", "build", ".next", ".cache",
+    "AppData", ".mypy_cache", ".pytest_cache", "$RECYCLE.BIN",
+    "System Volume Information"
+  ],
+  "index_path": "C:\\Users\\<you>\\.plethora-mjolnir\\index.sqlite3",
+  "max_file_mb": 25.0,
+  "chunk_chars": 1000,
+  "chunk_overlap": 150,
+  "embed_backend": "hashing",
+  "embed_model": "all-MiniLM-L6-v2",
+  "watch_interval": 5.0,
+  "watch_debounce": 1.5,
+  "web_host": "127.0.0.1",
+  "web_port": 8765,
+
+  "//ignore_gitignore": "Honour .gitignore files (repo root + nested) while walking. .gitignore syntax supported: # comments, blank lines, ! negation, leading-slash anchoring, trailing-slash directory-only, * ? ** globs and [abc]/[a-z] character classes.",
+  "ignore_gitignore": true,
+
+  "//max_line_chars": "A text file with any single line longer than this is treated as minified/binary-ish and skipped (bundled JS, one-line JSON). PDF/DOCX are exempt. Set to 0 to disable.",
+  "max_line_chars": 1000,
+
+  "//ui_width": "Launcher window width in px.",
+  "ui_width": 760,
+
+  "//ui_height": "Launcher window height in px (result list grows up to this).",
+  "ui_height": 480,
+
+  "//debounce_ms": "Keystroke debounce before a search is fired, in milliseconds.",
+  "debounce_ms": 120,
+
+  "//theme": "Design tokens for the launcher. Mirrors mjolnir/styles.py; change them here to re-skin the UI without touching code. shadow.alpha is 0-255 (115 ~= 0.45).",
+  "theme": {
+    "bg": "#161618",
+    "border": "#2A2A2E",
+    "input_bg": "#1C1C1F",
+    "fg": "#ECECEC",
+    "fg_muted": "#8A8A93",
+    "accent_solid": "#6366F1",
+    "radius": 12,
+    "shadow": {
+      "blur": 28,
+      "dx": 0,
+      "dy": 8,
+      "alpha": 115
+    }
+  },
+
+  "//bindings": "Keyboard bindings shown in the launcher footer. 'open' opens the hit, 'reveal' selects it in Explorer, 'copy' copies the full path, 'actions' opens the quick-action menu, 'close' hides the launcher, 'reindex' re-runs the indexer. 'clipboard' is the global hotkey that swaps the launcher into clipboard history mode, 'paste' is the one-key paste inside it.",
+  "bindings": {
+    "open": "Enter",
+    "reveal": "Shift+Enter",
+    "copy": "Ctrl+C",
+    "actions": "Tab",
+    "close": "Esc",
+    "reindex": "Ctrl+R",
+    "clipboard": "Alt+Shift+C",
+    "paste": "Enter"
+  },
+
+  "//clipboard_enabled": "Run the background clipboard watcher (Alt+Shift+C or 'cb' in the search bar opens the history). Copies are detected through the Win32 clipboard sequence number, not by polling the clipboard text.",
+  "clipboard_enabled": true,
+
+  "//clipboard_db": "SQLite file for the clipboard history. Lives next to the index in the config directory (PLETHORA_HOME, default %USERPROFILE%\\.plethora-mjolnir).",
+  "clipboard_db": "C:\\Users\\<you>\\.plethora-mjolnir\\clipboard.db",
+
+  "//clipboard_max_items": "How many clipboard entries to keep; the oldest are trimmed whenever a new copy is recorded.",
+  "clipboard_max_items": 500,
+
+  "//clipboard_max_chars": "Copies longer than this many characters are ignored (a whole file dump would bloat the history).",
+  "clipboard_max_chars": 100000,
+
+  "//clipboard_poll_ms": "Watcher tick in milliseconds. Each tick compares one integer (the clipboard sequence number); the clipboard text is only read when that number changed.",
+  "clipboard_poll_ms": 500
+}

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build & Release Artifacts
+build/
+dist/
+dist-installer/
+fastembed_cache/
+
+# PLETHORA MJOLNIR local state
+.testhome/
+*.sqlite3
+*.db
+*.log
+

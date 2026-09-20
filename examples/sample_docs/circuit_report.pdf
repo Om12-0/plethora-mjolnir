@@ -1,0 +1,75 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 310 >>
+stream
+BT
+/F1 12 Tf
+14 TL
+72 720 Td
+(PHY2049 - Lab 3: RC Circuit Capacitor Discharge) Tj
+T*
+(Date: June 14, 2025) Tj
+T*
+() Tj
+T*
+(Objective: measure the time constant of an RC circuit by) Tj
+T*
+(recording capacitor voltage during discharge and fitting an) Tj
+T*
+(exponential decay V\(t\) = V0 * exp\(-t / RC\).) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 314 >>
+stream
+BT
+/F1 12 Tf
+14 TL
+72 720 Td
+(Results) Tj
+T*
+() Tj
+T*
+(Measured tau = 0.98 s for R = 10 kOhm and C = 100 uF.) Tj
+T*
+(The exponential fit matches the data to within 2%.) Tj
+T*
+() Tj
+T*
+(Conclusion: the capacitor discharge follows the expected) Tj
+T*
+(exponential law and the time constant agrees with theory.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000552 00000 n 
+0000000678 00000 n 
+0000001043 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1169
+%%EOF

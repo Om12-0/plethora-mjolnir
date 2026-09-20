@@ -1,0 +1,15 @@
+# Core: the indexer and search run on the Python standard library alone.
+# The packages below unlock the full experience (all optional, all auto-detected):
+
+pypdf>=4.0              # PDF text extraction (with page numbers)
+python-docx>=1.1        # .docx text + tables
+watchdog>=4.0           # instant, event-driven background watching
+
+fastembed>=0.3          # dense ONNX embeddings (bge-small-en-v1.5, 384-dim)
+onnxruntime>=1.17       # CPU inference runtime for fastembed
+sqlite-vec>=0.1         # fast KNN inside SQLite
+
+PySide6>=6.6            # floating Alfred-style launcher GUI
+
+# Alternative embedding backend (heavier, pulls in PyTorch):
+# sentence-transformers>=3.0
