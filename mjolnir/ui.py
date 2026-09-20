@@ -1,5 +1,5 @@
 """
-mjolnir/ui.py - The Alfred Spotlight Launcher Interface for Windows.
+mjolnir/ui.py - Alfred 5 Spotlight Interface with Instant Response & Action Bar.
 """
 
 import os
@@ -10,22 +10,26 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QLabel, QFrame, QSystemTrayIcon, QMenu, QStyle, QApplication
 )
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
-from PySide6.QtGui import QIcon, QKeyEvent, QGuiApplication, QClipboard
+from PySide6.QtGui import QKeyEvent, QGuiApplication
 
 from mjolnir.engine import SearchEngine
 from mjolnir.settings import load_settings, THEMES, PreferencesDialog
 
-class AsyncWorker(QThread):
+class AsyncSearchWorker(QThread):
     results_ready = Signal(int, list)
 
-    def __init__(self, qid: int, query: str):
+    def __init__(self, qid: int, query: str, limit: int = 9):
         super().__init__()
         self.qid = qid
         self.query = query
+        self.limit = limit
 
     def run(self):
-        res = SearchEngine.instance().query(self.query)
-        self.results_ready.emit(self.qid, res)
+        try:
+            results = SearchEngine.instance().query(self.query, limit=self.limit)
+        except Exception:
+            results = []
+        self.results_ready.emit(self.qid, results)
 
 class MjolnirWindow(QWidget):
     def __init__(self):
@@ -34,186 +38,180 @@ class MjolnirWindow(QWidget):
         self.query_id = 0
         self.worker = None
 
-        self._setup_window_flags()
-        self._build_interface()
+        self._init_window()
+        self._build_ui()
         self._setup_tray()
         self.apply_theme()
 
-        # 40ms debounce timer for keystroke responsiveness
         self.debounce = QTimer()
         self.debounce.setSingleShot(True)
-        self.debounce.timeout.connect(self._dispatch_search)
+        self.debounce.timeout.connect(self._run_search)
 
-    def _setup_window_flags(self):
+    def _init_window(self):
         self.setWindowFlags(
             Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint |
             Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.resize(750, 460)
+        self.resize(760, 460)
 
-    def _build_interface(self):
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Outer Container Card
         self.card = QFrame()
-        self.card.setObjectName("card")
-        card_layout = QVBoxLayout(self.card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
-        card_layout.setSpacing(10)
+        self.card.setObjectName("mainCard")
+        cl = QVBoxLayout(self.card)
+        cl.setContentsMargins(14, 14, 14, 14)
+        cl.setSpacing(10)
 
-        # 1. Search Bar Top Row
+        # Header Search Row
         top_row = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("Search apps, documents, or paths...")
-        self.search_input.textChanged.connect(self._on_text_changed)
-        top_row.addWidget(self.search_input)
+        self.search_bar = QLineEdit()
+        self.search_bar.setObjectName("searchBar")
+        self.search_bar.setPlaceholderText("Search apps, documents, games, or paths...")
+        self.search_bar.textChanged.connect(self._on_text_changed)
+        top_row.addWidget(self.search_bar)
 
-        # Settings Gear Icon
         self.gear_btn = QLabel("⚙")
         self.gear_btn.setObjectName("gearBtn")
         self.gear_btn.setCursor(Qt.PointingHandCursor)
-        self.gear_btn.mousePressEvent = lambda _: self.open_preferences()
+        self.gear_btn.mousePressEvent = lambda _: self.open_settings()
         top_row.addWidget(self.gear_btn)
-        card_layout.addLayout(top_row)
+        cl.addLayout(top_row)
 
-        # 2. Main Content Split View (List + Preview)
+        # Split Content (Results List + Preview)
         content_row = QHBoxLayout()
-        self.results_list = QListWidget()
-        self.results_list.setObjectName("resultsList")
-        self.results_list.currentRowChanged.connect(self._on_row_changed)
-        self.results_list.itemDoubleClicked.connect(self._execute_primary)
-        content_row.addWidget(self.results_list, stretch=6)
+        self.result_list = QListWidget()
+        self.result_list.setObjectName("resultList")
+        self.result_list.currentRowChanged.connect(self._on_row_changed)
+        self.result_list.itemDoubleClicked.connect(self._action_open)
+        content_row.addWidget(self.result_list, stretch=6)
 
-        # Alfred Preview Inspector
-        self.preview_box = QFrame()
-        self.preview_box.setObjectName("previewBox")
-        pb_layout = QVBoxLayout(self.preview_box)
-        pb_layout.setContentsMargins(12, 12, 12, 12)
+        self.preview = QFrame()
+        self.preview.setObjectName("previewBox")
+        pl = QVBoxLayout(self.preview)
+        pl.setContentsMargins(12, 12, 12, 12)
 
-        self.preview_title = QLabel("No selection")
-        self.preview_title.setObjectName("previewTitle")
-        self.preview_title.setWordWrap(True)
-        pb_layout.addWidget(self.preview_title)
+        self.prev_title = QLabel("No selection")
+        self.prev_title.setObjectName("prevTitle")
+        self.prev_title.setWordWrap(True)
+        pl.addWidget(self.prev_title)
 
-        self.preview_meta = QLabel("")
-        self.preview_meta.setObjectName("previewMeta")
-        self.preview_meta.setWordWrap(True)
-        pb_layout.addWidget(self.preview_meta)
-        pb_layout.addStretch()
+        self.prev_meta = QLabel("")
+        self.prev_meta.setObjectName("prevMeta")
+        self.prev_meta.setWordWrap(True)
+        pl.addWidget(self.prev_meta)
+        pl.addStretch()
+        content_row.addWidget(self.preview, stretch=4)
+        cl.addLayout(content_row)
 
-        content_row.addWidget(self.preview_box, stretch=4)
-        card_layout.addLayout(content_row)
-
-        # 3. Alfred Action Bar (Footer)
+        # Action Footer
         self.footer = QFrame()
-        self.footer.setObjectName("footer")
-        ft_layout = QHBoxLayout(self.footer)
-        ft_layout.setContentsMargins(8, 4, 8, 4)
+        self.footer.setObjectName("footerBar")
+        fl = QHBoxLayout(self.footer)
+        fl.setContentsMargins(8, 4, 8, 4)
 
         self.status_lbl = QLabel("Ready")
-        self.status_lbl.setObjectName("footerLabel")
-        ft_layout.addWidget(self.status_lbl)
-        ft_layout.addStretch()
+        self.status_lbl.setObjectName("footerText")
+        fl.addWidget(self.status_lbl)
+        fl.addStretch()
 
         actions = QLabel("↵ Open   Alt+↵ Reveal   Ctrl+C Copy   Ctrl+T Terminal   Esc Close")
         actions.setObjectName("footerActions")
-        ft_layout.addWidget(actions)
-        card_layout.addWidget(self.footer)
+        fl.addWidget(actions)
+        cl.addWidget(self.footer)
 
-        self.main_layout.addWidget(self.card)
+        layout.addWidget(self.card)
 
     def apply_theme(self):
         self.cfg = load_settings()
-        theme = THEMES.get(self.cfg.get("theme"), THEMES["Plethora Obsidian"])
+        t = THEMES.get(self.cfg.get("theme"), THEMES["Plethora Obsidian"])
         op = self.cfg.get("opacity", 96) / 100.0
         self.setWindowOpacity(op)
 
-        style = f"""
-            #card {{
-                background-color: {theme['bg']};
-                border: 1px solid {theme['border']};
+        self.setStyleSheet(f"""
+            #mainCard {{
+                background-color: {t['bg']};
+                border: 1px solid {t['border']};
                 border-radius: 12px;
             }}
-            #searchInput {{
-                background-color: {theme['card']};
-                color: {theme['text']};
-                border: 1px solid {theme['border']};
+            #searchBar {{
+                background-color: {t['card']};
+                color: {t['text']};
+                border: 1px solid {t['border']};
                 border-radius: 8px;
                 padding: 10px 14px;
                 font-size: 16px;
             }}
-            #searchInput:focus {{
-                border: 1px solid {theme['accent']};
+            #searchBar:focus {{
+                border: 1px solid {t['accent']};
             }}
             #gearBtn {{
                 font-size: 18px;
-                color: {theme['subtext']};
+                color: {t['subtext']};
                 padding: 4px;
             }}
             #gearBtn:hover {{
-                color: {theme['accent']};
+                color: {t['accent']};
             }}
-            #resultsList {{
-                background-color: {theme['bg']};
+            #resultList {{
+                background-color: {t['bg']};
                 border: none;
-                color: {theme['text']};
+                color: {t['text']};
                 font-size: 14px;
             }}
-            #resultsList::item {{
+            #resultList::item {{
                 padding: 8px 10px;
                 border-radius: 6px;
                 margin-bottom: 2px;
             }}
-            #resultsList::item:selected {{
-                background-color: {theme['accent']};
+            #resultList::item:selected {{
+                background-color: {t['accent']};
                 color: #ffffff;
             }}
             #previewBox {{
-                background-color: {theme['card']};
-                border: 1px solid {theme['border']};
+                background-color: {t['card']};
+                border: 1px solid {t['border']};
                 border-radius: 8px;
             }}
-            #previewTitle {{
+            #prevTitle {{
                 font-size: 15px;
                 font-weight: bold;
-                color: {theme['text']};
+                color: {t['text']};
             }}
-            #previewMeta {{
+            #prevMeta {{
                 font-size: 12px;
-                color: {theme['subtext']};
+                color: {t['subtext']};
             }}
-            #footer {{
-                background-color: {theme['card']};
+            #footerBar {{
+                background-color: {t['card']};
                 border-radius: 6px;
             }}
-            #footerLabel, #footerActions {{
+            #footerText, #footerActions {{
                 font-size: 11px;
-                color: {theme['subtext']};
+                color: {t['subtext']};
             }}
-        """
-        self.setStyleSheet(style)
+        """)
 
     def show_centered(self):
         screen = QGuiApplication.primaryScreen().availableGeometry()
         x = screen.x() + (screen.width() - self.width()) // 2
-        y = screen.y() + (screen.height() - self.height()) // 3  # Alfred upper-third
+        y = screen.y() + (screen.height() - self.height()) // 3
         self.move(x, y)
         self.show()
         self.raise_()
         self.activateWindow()
-        self.search_input.setFocus()
-        self.search_input.selectAll()
+        self.search_bar.setFocus()
+        self.search_bar.selectAll()
 
     def _setup_tray(self):
         self.tray = QSystemTrayIcon(self)
         self.tray.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
         menu = QMenu()
         menu.addAction("Show Mjolnir (Alt+Space)", self.show_centered)
-        menu.addAction("Preferences...", self.open_preferences)
+        menu.addAction("Preferences...", self.open_settings)
         menu.addSeparator()
         menu.addAction("Quit", QApplication.instance().quit)
         self.tray.setContextMenu(menu)
@@ -222,111 +220,109 @@ class MjolnirWindow(QWidget):
 
     def _on_text_changed(self, text: str):
         if not text.strip():
-            self.results_list.clear()
-            self.preview_title.setText("No selection")
-            self.preview_meta.setText("")
+            self.result_list.clear()
+            self.prev_title.setText("No selection")
+            self.prev_meta.setText("")
             self.status_lbl.setText("Ready")
             return
-        self.debounce.start(40)
+        self.debounce.start(30)
 
-    def _dispatch_search(self):
+    def _run_search(self):
         self.query_id += 1
-        query = self.search_input.text()
-        self.worker = AsyncWorker(self.query_id, query)
-        self.worker.results_ready.connect(self._on_results)
+        query = self.search_bar.text()
+        limit = self.cfg.get("max_results", 9)
+        # Clean up previous worker to avoid zombie threads
+        try:
+            if self.worker is not None and self.worker.isRunning():
+                pass  # let it finish; results are discarded via query_id check
+        except Exception:
+            pass
+        self.worker = AsyncSearchWorker(self.query_id, query, limit=limit)
+        self.worker.results_ready.connect(self._populate_results)
+        self.worker.finished.connect(self.worker.deleteLater)
         self.worker.start()
 
-    def _on_results(self, qid: int, results: list):
+    def _populate_results(self, qid: int, results: list):
         if qid != self.query_id:
-            return  # Drop out-of-order responses
+            return
 
-        self.results_list.clear()
+        self.result_list.clear()
         for r in results:
             item = QListWidgetItem(f"[{r['category']}]  {r['title']}")
             item.setData(Qt.UserRole, r)
-            self.results_list.addItem(item)
+            self.result_list.addItem(item)
 
         if results:
-            self.results_list.setCurrentRow(0)
-            self.status_lbl.setText(f"{len(results)} matches")
+            self.result_list.setCurrentRow(0)
+            self.status_lbl.setText(f"{len(results)} matches found")
         else:
-            self.preview_title.setText("No results found")
-            self.preview_meta.setText("")
+            self.prev_title.setText("No results found")
+            self.prev_meta.setText("")
             self.status_lbl.setText("0 matches")
 
     def _on_row_changed(self, row: int):
-        if row < 0 or row >= self.results_list.count():
+        if row < 0 or row >= self.result_list.count():
             return
-        item = self.results_list.item(row)
+        item = self.result_list.item(row)
         data = item.data(Qt.UserRole)
-        self.preview_title.setText(data.get("title", ""))
-        self.preview_meta.setText(f"Path: {data.get('path', '')}\nCategory: {data.get('category', '')}")
+        self.prev_title.setText(data.get("title", ""))
+        self.prev_meta.setText(f"Path: {data.get('path', '')}\nCategory: {data.get('category', '')}")
 
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
-        modifiers = event.modifiers()
+        mods = event.modifiers()
 
-        # ESC: Close launcher
         if key == Qt.Key_Escape:
             self.hide()
             return
-
-        # Up / Down: Navigate list
-        if key == Qt.Key_Down:
-            curr = self.results_list.currentRow()
-            if curr < self.results_list.count() - 1:
-                self.results_list.setCurrentRow(curr + 1)
+        elif key == Qt.Key_Down:
+            c = self.result_list.currentRow()
+            if c < self.result_list.count() - 1:
+                self.result_list.setCurrentRow(c + 1)
             return
         elif key == Qt.Key_Up:
-            curr = self.results_list.currentRow()
-            if curr > 0:
-                self.results_list.setCurrentRow(curr - 1)
+            c = self.result_list.currentRow()
+            if c > 0:
+                self.result_list.setCurrentRow(c - 1)
             return
-
-        # Enter: Open / Launch
-        if key in (Qt.Key_Return, Qt.Key_Enter):
-            if modifiers & Qt.AltModifier or modifiers & Qt.ControlModifier:
-                self._execute_reveal()
+        elif key in (Qt.Key_Return, Qt.Key_Enter):
+            if mods & (Qt.AltModifier | Qt.ControlModifier):
+                self._action_reveal()
             else:
-                self._execute_primary()
+                self._action_open()
             return
-
-        # Ctrl+C: Copy Path
-        if modifiers & Qt.ControlModifier and key == Qt.Key_C:
-            self._execute_copy()
+        elif mods & Qt.ControlModifier and key == Qt.Key_C:
+            self._action_copy()
             return
-
-        # Ctrl+T: Open in Terminal
-        if modifiers & Qt.ControlModifier and key == Qt.Key_T:
-            self._execute_terminal()
+        elif mods & Qt.ControlModifier and key == Qt.Key_T:
+            self._action_terminal()
             return
-
-        # Ctrl+, : Open Preferences
-        if modifiers & Qt.ControlModifier and key == Qt.Key_Comma:
-            self.open_preferences()
+        elif mods & Qt.ControlModifier and key == Qt.Key_Comma:
+            self.open_settings()
             return
-
-        # Alt+1 to Alt+9: Quick Select
-        if modifiers & Qt.AltModifier and Qt.Key_1 <= key <= Qt.Key_9:
+        elif mods & Qt.AltModifier and Qt.Key_1 <= key <= Qt.Key_9:
             idx = key - Qt.Key_1
-            if idx < self.results_list.count():
-                self.results_list.setCurrentRow(idx)
-                self._execute_primary()
+            if idx < self.result_list.count():
+                self.result_list.setCurrentRow(idx)
+                self._action_open()
             return
 
         super().keyPressEvent(event)
 
-    def _execute_primary(self):
-        curr = self.results_list.currentItem()
+    def _action_open(self):
+        curr = self.result_list.currentItem()
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
-        if path and os.path.exists(path):
-            os.startfile(path)
-            self.hide()
+        if path:
+            try:
+                os.startfile(path)
+                self.hide()
+            except Exception as e:
+                self.status_lbl.setText(f"Launch error: {e}")
 
-    def _execute_reveal(self):
-        curr = self.results_list.currentItem()
+    def _action_reveal(self):
+        curr = self.result_list.currentItem()
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
@@ -334,8 +330,8 @@ class MjolnirWindow(QWidget):
             subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
             self.hide()
 
-    def _execute_copy(self):
-        curr = self.results_list.currentItem()
+    def _action_copy(self):
+        curr = self.result_list.currentItem()
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
@@ -343,14 +339,17 @@ class MjolnirWindow(QWidget):
             QApplication.clipboard().setText(path)
             self.status_lbl.setText("Copied path to clipboard!")
 
-    def _execute_terminal(self):
-        curr = self.results_list.currentItem()
+    def _action_terminal(self):
+        curr = self.result_list.currentItem()
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
-        target_dir = path if os.path.isdir(path) else os.path.dirname(path)
-        if os.path.exists(target_dir):
-            subprocess.Popen(["wt.exe", "-d", target_dir], shell=True)
+        target = path if os.path.isdir(path) else os.path.dirname(path)
+        if target and os.path.exists(target):
+            try:
+                subprocess.Popen(["wt.exe", "-d", target])
+            except FileNotFoundError:
+                subprocess.Popen(f'cmd.exe /K cd /d "{target}"', shell=True)
             self.hide()
 
     def changeEvent(self, event):
@@ -359,7 +358,7 @@ class MjolnirWindow(QWidget):
                 self.hide()
         super().changeEvent(event)
 
-    def open_preferences(self):
+    def open_settings(self):
         dlg = PreferencesDialog(self)
-        dlg.theme_updated.connect(self.apply_theme)
+        dlg.theme_changed.connect(self.apply_theme)
         dlg.exec()

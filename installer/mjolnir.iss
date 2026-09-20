@@ -1,5 +1,5 @@
 #define MyAppName "Plethora Mjolnir"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.1.0"
 #define MyAppPublisher "Plethora Labs"
 #define MyAppURL "https://github.com/Om12-0/plethora-mjolnir"
 #define MyAppExeName "mjolnir.exe"
@@ -12,7 +12,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=Plethora-Mjolnir-Setup-2.0.0
+OutputBaseFilename=Plethora-Mjolnir-Setup-2.1.0
 OutputDir=..\dist-installer
 Compression=lzma2/ultra64
 SolidCompression=yes

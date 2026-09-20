@@ -1,5 +1,5 @@
 """
-mjolnir/settings.py - Alfred-Style Configuration & Theme Engine.
+mjolnir/settings.py - Alfred Preferences & Appearance Configuration.
 """
 
 import json
@@ -11,28 +11,28 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-SETTINGS_PATH = os.path.expandvars(r"%APPDATA%\Plethora\mjolnir\settings.json")
+SETTINGS_FILE = os.path.expandvars(r"%APPDATA%\Plethora\mjolnir\settings.json")
 
 THEMES = {
     "Plethora Obsidian": {
-        "bg": "#0c0d12",
-        "card": "#141721",
+        "bg": "#0b0d13",
+        "card": "#131722",
         "accent": "#7c3aed",
-        "text": "#f3f4f6",
+        "text": "#f9fafb",
         "subtext": "#9ca3af",
-        "border": "#272a38"
+        "border": "#242938"
     },
     "Alfred Classic Charcoal": {
-        "bg": "#1e1e1e",
-        "card": "#2d2d2d",
+        "bg": "#1c1c1e",
+        "card": "#2c2c2e",
         "accent": "#d97706",
         "text": "#ffffff",
-        "subtext": "#888888",
-        "border": "#3c3c3c"
+        "subtext": "#8e8e93",
+        "border": "#3a3a3c"
     },
-    "Cyberpunk Midnight": {
-        "bg": "#08090d",
-        "card": "#10131d",
+    "Cyberpunk Neon": {
+        "bg": "#090a0f",
+        "card": "#0f1422",
         "accent": "#06b6d4",
         "text": "#e0f2fe",
         "subtext": "#64748b",
@@ -54,26 +54,26 @@ DEFAULT_SETTINGS = {
 }
 
 def load_settings() -> dict:
-    if os.path.exists(SETTINGS_PATH):
+    if os.path.exists(SETTINGS_FILE):
         try:
-            with open(SETTINGS_PATH, "r") as f:
+            with open(SETTINGS_FILE, "r") as f:
                 return {**DEFAULT_SETTINGS, **json.load(f)}
         except Exception:
             pass
     return DEFAULT_SETTINGS.copy()
 
 def save_settings(cfg: dict):
-    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-    with open(SETTINGS_PATH, "w") as f:
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
         json.dump(cfg, f, indent=2)
 
 class PreferencesDialog(QDialog):
-    theme_updated = Signal()
+    theme_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Plethora Mjolnir Preferences")
-        self.resize(560, 440)
+        self.resize(560, 420)
         self.cfg = load_settings()
         self._build_ui()
 
@@ -82,61 +82,61 @@ class PreferencesDialog(QDialog):
         tabs = QTabWidget()
 
         # Tab 1: General
-        t1 = QWidget()
-        l1 = QVBoxLayout(t1)
-        hb = QGroupBox("Keyboard Shortcut")
-        hbl = QHBoxLayout(hb)
-        hbl.addWidget(QLabel("Global Invocation:"))
-        self.hk = QLineEdit(self.cfg["hotkey"])
-        hbl.addWidget(self.hk)
-        l1.addWidget(hb)
+        gen = QWidget()
+        gl = QVBoxLayout(gen)
+        hk_box = QGroupBox("Keyboard Shortcut")
+        hkl = QHBoxLayout(hk_box)
+        hkl.addWidget(QLabel("Global Invocation:"))
+        self.hk_input = QLineEdit(self.cfg["hotkey"])
+        hkl.addWidget(self.hk_input)
+        gl.addWidget(hk_box)
 
-        self.cb_blur = QCheckBox("Dismiss window when focus is lost")
+        self.cb_blur = QCheckBox("Dismiss window on lost focus (click outside)")
         self.cb_blur.setChecked(self.cfg["hide_on_blur"])
-        l1.addWidget(self.cb_blur)
-        l1.addStretch()
-        tabs.addTab(t1, "General")
+        gl.addWidget(self.cb_blur)
+        gl.addStretch()
+        tabs.addTab(gen, "General")
 
-        # Tab 2: Appearance (Alfred Theming)
-        t2 = QWidget()
-        l2 = QVBoxLayout(t2)
-        l2.addWidget(QLabel("Color Theme:"))
-        self.theme_sel = QComboBox()
-        self.theme_sel.addItems(list(THEMES.keys()))
-        self.theme_sel.setCurrentText(self.cfg["theme"])
-        l2.addWidget(self.theme_sel)
+        # Tab 2: Appearance
+        app = QWidget()
+        al = QVBoxLayout(app)
+        al.addWidget(QLabel("Color Theme:"))
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(list(THEMES.keys()))
+        self.theme_combo.setCurrentText(self.cfg["theme"])
+        al.addWidget(self.theme_combo)
 
-        l2.addWidget(QLabel("Window Opacity (%):"))
+        al.addWidget(QLabel("Window Opacity (%):"))
         self.op_slider = QSlider(Qt.Horizontal)
         self.op_slider.setRange(70, 100)
         self.op_slider.setValue(self.cfg["opacity"])
-        l2.addWidget(self.op_slider)
+        al.addWidget(self.op_slider)
 
-        l2.addWidget(QLabel("Visible Results Limit:"))
-        self.max_res = QSpinBox()
-        self.max_res.setRange(5, 15)
-        self.max_res.setValue(self.cfg["max_results"])
-        l2.addWidget(self.max_res)
-        l2.addStretch()
-        tabs.addTab(t2, "Appearance")
+        al.addWidget(QLabel("Max Results:"))
+        self.res_spin = QSpinBox()
+        self.res_spin.setRange(5, 15)
+        self.res_spin.setValue(self.cfg["max_results"])
+        al.addWidget(self.res_spin)
+        al.addStretch()
+        tabs.addTab(app, "Appearance")
 
         # Tab 3: Search Paths
-        t3 = QWidget()
-        l3 = QVBoxLayout(t3)
+        scope = QWidget()
+        sl = QVBoxLayout(scope)
         self.path_list = QListWidget()
         for p in self.cfg["search_paths"]:
             self.path_list.addItem(p)
-        l3.addWidget(self.path_list)
+        sl.addWidget(self.path_list)
 
-        btn_row = QHBoxLayout()
+        btn_bar = QHBoxLayout()
         add_b = QPushButton("Add Folder...")
-        add_b.clicked.connect(self._add_path)
+        add_b.clicked.connect(self._add_dir)
         rem_b = QPushButton("Remove")
-        rem_b.clicked.connect(self._rem_path)
-        btn_row.addWidget(add_b)
-        btn_row.addWidget(rem_b)
-        l3.addLayout(btn_row)
-        tabs.addTab(t3, "Search Scope")
+        rem_b.clicked.connect(self._rem_dir)
+        btn_bar.addWidget(add_b)
+        btn_bar.addWidget(rem_b)
+        sl.addLayout(btn_bar)
+        tabs.addTab(scope, "Search Scope")
 
         layout.addWidget(tabs)
 
@@ -150,22 +150,22 @@ class PreferencesDialog(QDialog):
         bot.addWidget(save_btn)
         layout.addLayout(bot)
 
-    def _add_path(self):
+    def _add_dir(self):
         f = QFileDialog.getExistingDirectory(self, "Add Search Folder")
         if f:
             self.path_list.addItem(f)
 
-    def _rem_path(self):
+    def _rem_dir(self):
         for item in self.path_list.selectedItems():
             self.path_list.takeItem(self.path_list.row(item))
 
     def _save(self):
-        self.cfg["hotkey"] = self.hk.text()
+        self.cfg["hotkey"] = self.hk_input.text()
         self.cfg["hide_on_blur"] = self.cb_blur.isChecked()
-        self.cfg["theme"] = self.theme_sel.currentText()
+        self.cfg["theme"] = self.theme_combo.currentText()
         self.cfg["opacity"] = self.op_slider.value()
-        self.cfg["max_results"] = self.max_res.value()
+        self.cfg["max_results"] = self.res_spin.value()
         self.cfg["search_paths"] = [self.path_list.item(i).text() for i in range(self.path_list.count())]
         save_settings(self.cfg)
-        self.theme_updated.emit()
+        self.theme_changed.emit()
         self.accept()
