@@ -10,10 +10,27 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QLabel, QFrame, QSystemTrayIcon, QMenu, QStyle, QApplication
 )
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
-from PySide6.QtGui import QKeyEvent, QGuiApplication
+from PySide6.QtGui import QKeyEvent, QGuiApplication, QIcon
+from PySide6.QtWidgets import QMessageBox
 
 from mjolnir.engine import SearchEngine
 from mjolnir.settings import load_settings, THEMES, PreferencesDialog
+from mjolnir.updater import UpdateCheckWorker, perform_silent_upgrade
+
+def _asset_path(name: str):
+    """Resolves bundled asset paths in source tree and PyInstaller bundle."""
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "assets", name),
+        os.path.join(getattr(sys, "_MEIPASS", os.getcwd()), "assets", name),
+        os.path.join(os.getcwd(), "assets", name),
+    ]
+    for p in candidates:
+        try:
+            if p and os.path.exists(p):
+                return p
+        except Exception:
+            continue
+    return None
 
 class AsyncSearchWorker(QThread):
     results_ready = Signal(int, list)
@@ -47,6 +64,16 @@ class MjolnirWindow(QWidget):
         self.debounce.setSingleShot(True)
         self.debounce.timeout.connect(self._run_search)
 
+        # Keraunos-style background update check on launch (opt-in via settings).
+        self._upd_worker = None
+        try:
+            if self.cfg.get("check_updates_startup", True):
+                self._upd_worker = UpdateCheckWorker()
+                self._upd_worker.update_available.connect(self._on_startup_update)
+                self._upd_worker.start()
+        except Exception:
+            pass
+
     def _init_window(self):
         self.setWindowFlags(
             Qt.FramelessWindowHint |
@@ -55,6 +82,12 @@ class MjolnirWindow(QWidget):
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(760, 460)
+        try:
+            icon = _asset_path("icon.ico")
+            if icon:
+                self.setWindowIcon(QIcon(icon))
+        except Exception:
+            pass
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -208,7 +241,14 @@ class MjolnirWindow(QWidget):
 
     def _setup_tray(self):
         self.tray = QSystemTrayIcon(self)
-        self.tray.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
+        try:
+            icon = _asset_path("icon.ico")
+            if icon:
+                self.tray.setIcon(QIcon(icon))
+            else:
+                self.tray.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
+        except Exception:
+            self.tray.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
         menu = QMenu()
         menu.addAction("Show Mjolnir (Alt+Space)", self.show_centered)
         menu.addAction("Preferences...", self.open_settings)
@@ -362,3 +402,16 @@ class MjolnirWindow(QWidget):
         dlg = PreferencesDialog(self)
         dlg.theme_changed.connect(self.apply_theme)
         dlg.exec()
+
+    def _on_startup_update(self, version_tag, download_url, notes):
+        try:
+            ans = QMessageBox.question(
+                self,
+                "Update Available",
+                f"Plethora Mjolnir v{version_tag} is available!\n\nRelease Notes:\n{notes}\n\nInstall now?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if ans == QMessageBox.Yes:
+                perform_silent_upgrade(download_url)
+        except Exception:
+            pass

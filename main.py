@@ -8,6 +8,7 @@ import ctypes
 from ctypes import wintypes
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QAbstractNativeEventFilter, QTimer
+from PySide6.QtGui import QIcon
 
 from mjolnir.ui import MjolnirWindow
 
@@ -34,6 +35,10 @@ class Win32HotkeyFilter(QAbstractNativeEventFilter):
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     window = MjolnirWindow()
 

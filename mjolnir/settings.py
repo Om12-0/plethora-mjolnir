@@ -1,5 +1,5 @@
 """
-mjolnir/settings.py - Alfred Preferences & Appearance Configuration.
+mjolnir/settings.py - Preferences & Configuration Panel.
 """
 
 import json
@@ -7,9 +7,12 @@ import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QCheckBox, QSlider, QComboBox, QLineEdit, QPushButton,
-    QFileDialog, QListWidget, QGroupBox, QSpinBox
+    QFileDialog, QListWidget, QGroupBox, QSpinBox, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon
+
+from mjolnir.updater import CURRENT_VERSION, UpdateCheckWorker, perform_silent_upgrade
 
 SETTINGS_FILE = os.path.expandvars(r"%APPDATA%\Plethora\mjolnir\settings.json")
 
@@ -46,6 +49,7 @@ DEFAULT_SETTINGS = {
     "theme": "Plethora Obsidian",
     "opacity": 96,
     "max_results": 9,
+    "check_updates_startup": True,
     "search_paths": [
         os.path.expanduser(r"~\Documents"),
         os.path.expanduser(r"~\Desktop"),
@@ -73,8 +77,14 @@ class PreferencesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Plethora Mjolnir Preferences")
-        self.resize(560, 420)
+        self.resize(580, 460)
         self.cfg = load_settings()
+        self.worker = None
+
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         self._build_ui()
 
     def _build_ui(self):
@@ -91,7 +101,7 @@ class PreferencesDialog(QDialog):
         hkl.addWidget(self.hk_input)
         gl.addWidget(hk_box)
 
-        self.cb_blur = QCheckBox("Dismiss window on lost focus (click outside)")
+        self.cb_blur = QCheckBox("Dismiss window on blur (clicking outside)")
         self.cb_blur.setChecked(self.cfg["hide_on_blur"])
         gl.addWidget(self.cb_blur)
         gl.addStretch()
@@ -138,6 +148,23 @@ class PreferencesDialog(QDialog):
         sl.addLayout(btn_bar)
         tabs.addTab(scope, "Search Scope")
 
+        # Tab 4: Updates
+        upd = QWidget()
+        ul = QVBoxLayout(upd)
+        ul.addWidget(QLabel(f"<b>Plethora Mjolnir</b> v{CURRENT_VERSION}"))
+        self.cb_auto_upd = QCheckBox("Check for updates automatically on launch")
+        self.cb_auto_upd.setChecked(self.cfg.get("check_updates_startup", True))
+        ul.addWidget(self.cb_auto_upd)
+
+        self.btn_check_upd = QPushButton("Check for Updates Now")
+        self.btn_check_upd.clicked.connect(self._check_updates_now)
+        ul.addWidget(self.btn_check_upd)
+
+        self.upd_status = QLabel("Status: Idle")
+        ul.addWidget(self.upd_status)
+        ul.addStretch()
+        tabs.addTab(upd, "Updates")
+
         layout.addWidget(tabs)
 
         bot = QHBoxLayout()
@@ -159,12 +186,38 @@ class PreferencesDialog(QDialog):
         for item in self.path_list.selectedItems():
             self.path_list.takeItem(self.path_list.row(item))
 
+    def _check_updates_now(self):
+        self.upd_status.setText("Checking GitHub Releases...")
+        self.btn_check_upd.setEnabled(False)
+        self.worker = UpdateCheckWorker()
+        self.worker.update_available.connect(self._on_update_found)
+        self.worker.no_update.connect(lambda: self._upd_finished("You're up to date!"))
+        self.worker.error_occurred.connect(lambda e: self._upd_finished(f"Check failed: {e}"))
+        self.worker.start()
+
+    def _on_update_found(self, version_tag, download_url, notes):
+        self.btn_check_upd.setEnabled(True)
+        self.upd_status.setText(f"Update available: v{version_tag}")
+        ans = QMessageBox.question(
+            self,
+            "Update Available",
+            f"Plethora Mjolnir v{version_tag} is available!\n\nRelease Notes:\n{notes}\n\nInstall now?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if ans == QMessageBox.Yes:
+            perform_silent_upgrade(download_url)
+
+    def _upd_finished(self, text):
+        self.btn_check_upd.setEnabled(True)
+        self.upd_status.setText(text)
+
     def _save(self):
         self.cfg["hotkey"] = self.hk_input.text()
         self.cfg["hide_on_blur"] = self.cb_blur.isChecked()
         self.cfg["theme"] = self.theme_combo.currentText()
         self.cfg["opacity"] = self.op_slider.value()
         self.cfg["max_results"] = self.res_spin.value()
+        self.cfg["check_updates_startup"] = self.cb_auto_upd.isChecked()
         self.cfg["search_paths"] = [self.path_list.item(i).text() for i in range(self.path_list.count())]
         save_settings(self.cfg)
         self.theme_changed.emit()
