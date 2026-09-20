@@ -1,0 +1,8 @@
+build/
+dist/
+dist-installer/
+__pycache__/
+*.pyc
+*.spec
+.vscode/
+.idea/
