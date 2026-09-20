@@ -81,7 +81,9 @@ class PreferencesDialog(QDialog):
         self.cfg = load_settings()
         self.worker = None
 
-        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon.ico")
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon.png")
+        if not os.path.exists(icon_path):
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

@@ -40,7 +40,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico'
+    icon='assets/icon.ico',
+    uac_admin=True,  # Embeds requireAdministrator in PE application manifest
 )
 
 coll = COLLECT(

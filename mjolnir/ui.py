@@ -32,6 +32,17 @@ def _asset_path(name: str):
             continue
     return None
 
+def _app_icon():
+    """App icon, preferring icon.png with icon.ico fallback. Returns QIcon or None."""
+    try:
+        for name in ("icon.png", "icon.ico"):
+            p = _asset_path(name)
+            if p:
+                return QIcon(p)
+    except Exception:
+        pass
+    return None
+
 class AsyncSearchWorker(QThread):
     results_ready = Signal(int, list)
 
@@ -83,9 +94,9 @@ class MjolnirWindow(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.resize(760, 460)
         try:
-            icon = _asset_path("icon.ico")
-            if icon:
-                self.setWindowIcon(QIcon(icon))
+            icon = _app_icon()
+            if icon is not None:
+                self.setWindowIcon(icon)
         except Exception:
             pass
 
@@ -242,9 +253,9 @@ class MjolnirWindow(QWidget):
     def _setup_tray(self):
         self.tray = QSystemTrayIcon(self)
         try:
-            icon = _asset_path("icon.ico")
-            if icon:
-                self.tray.setIcon(QIcon(icon))
+            icon = _app_icon()
+            if icon is not None:
+                self.tray.setIcon(icon)
             else:
                 self.tray.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
         except Exception:
