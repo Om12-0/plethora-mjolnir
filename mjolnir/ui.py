@@ -364,26 +364,74 @@ class MjolnirWindow(QWidget):
 
         super().keyPressEvent(event)
 
-    def _action_open(self):
+    def _log_action(self, msg: str):
+        """Append launch/action diagnostics; survives even native crashes elsewhere."""
+        try:
+            import datetime
+            log = os.path.join(os.environ.get("TEMP", os.getcwd()), "mjolnir-crash.log")
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(f"[{datetime.datetime.now():%H:%M:%S}] {msg}\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _is_uri(path: str) -> bool:
+        try:
+            return "://" in path
+        except Exception:
+            return False
+
+    def _action_open(self, _item=None):
         curr = self.result_list.currentItem()
         if not curr:
             return
-        path = curr.data(Qt.UserRole).get("path")
-        if path:
-            try:
+        try:
+            data = curr.data(Qt.UserRole) or {}
+        except Exception:
+            return
+        path = data.get("path")
+        if not path:
+            self.status_lbl.setText("Nothing to open.")
+            return
+        self._log_action(f"OPEN path={path!r}")
+        try:
+            if self._is_uri(path):
+                # steam://, http(s):// etc: no existence check possible.
                 os.startfile(path)
-                self.hide()
-            except Exception as e:
+            else:
+                # Never hand a dangling path to ShellExecute (native AV risk).
+                if not os.path.lexists(path):
+                    self.status_lbl.setText("Target no longer exists.")
+                    self._log_action(f"OPEN skipped (missing): {path!r}")
+                    return
+                os.startfile(os.path.normpath(path))
+            self._log_action(f"OPEN ok: {path!r}")
+            self.hide()
+        except Exception as e:
+            self._log_action(f"OPEN failed: {path!r} err={e!r}")
+            try:
                 self.status_lbl.setText(f"Launch error: {e}")
+            except Exception:
+                pass
 
     def _action_reveal(self):
         curr = self.result_list.currentItem()
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
-        if path and os.path.exists(path):
-            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
-            self.hide()
+        if not path or self._is_uri(path):
+            return
+        if path and os.path.lexists(path):
+            try:
+                self._log_action(f"REVEAL path={path!r}")
+                subprocess.Popen(
+                    ["explorer", "/select,", os.path.normpath(path)],
+                    shell=False,
+                )
+                self.hide()
+            except Exception as e:
+                self._log_action(f"REVEAL failed: {path!r} err={e!r}")
+                self.status_lbl.setText(f"Reveal error: {e}")
 
     def _action_copy(self):
         curr = self.result_list.currentItem()
@@ -399,12 +447,19 @@ class MjolnirWindow(QWidget):
         if not curr:
             return
         path = curr.data(Qt.UserRole).get("path")
+        if not path or self._is_uri(path):
+            return
         target = path if os.path.isdir(path) else os.path.dirname(path)
         if target and os.path.exists(target):
             try:
+                self._log_action(f"TERMINAL dir={target!r}")
                 subprocess.Popen(["wt.exe", "-d", target])
             except FileNotFoundError:
                 subprocess.Popen(f'cmd.exe /K cd /d "{target}"', shell=True)
+            except Exception as e:
+                self._log_action(f"TERMINAL failed: {target!r} err={e!r}")
+                self.status_lbl.setText(f"Terminal error: {e}")
+                return
             self.hide()
 
     def changeEvent(self, event):
