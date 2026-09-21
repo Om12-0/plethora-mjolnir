@@ -13,6 +13,29 @@ from PySide6.QtGui import QIcon
 
 from mjolnir.ui import MjolnirWindow
 
+# --- Crash forensics: faulthandler + uncaught-exception log ---
+_CRASH_LOG = os.path.join(os.environ.get("TEMP", os.getcwd()), "mjolnir-crash.log")
+_faulthandler_file = None
+try:
+    import faulthandler
+    import datetime
+    import traceback
+    _faulthandler_file = open(_CRASH_LOG, "a")
+    faulthandler.enable(file=_faulthandler_file)
+
+    def _log_excepthook(exc_type, exc_value, exc_tb):
+        try:
+            with open(_CRASH_LOG, "a") as f:
+                f.write(f"\n--- {datetime.datetime.now():%Y-%m-%d %H:%M:%S} uncaught ---\n")
+                f.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+        except Exception:
+            pass
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _log_excepthook
+except Exception:
+    pass
+
 def is_admin() -> bool:
     try:
         return bool(ctypes.windll.shell32.IsUserAnAdmin())

@@ -65,6 +65,9 @@ class MjolnirWindow(QWidget):
         self.cfg = load_settings()
         self.query_id = 0
         self.worker = None
+        # Blur-hide grace: only auto-hide after the window has been active
+        # at least once. Prevents flash-and-vanish when focus is stolen at launch.
+        self._ever_active = False
 
         self._init_window()
         self._build_ui()
@@ -244,6 +247,7 @@ class MjolnirWindow(QWidget):
         x = screen.x() + (screen.width() - self.width()) // 2
         y = screen.y() + (screen.height() - self.height()) // 3
         self.move(x, y)
+        self._ever_active = False  # fresh grace period for this showing
         self.show()
         self.raise_()
         self.activateWindow()
@@ -405,7 +409,9 @@ class MjolnirWindow(QWidget):
 
     def changeEvent(self, event):
         if event.type() == event.Type.ActivationChange:
-            if not self.isActiveWindow() and self.cfg.get("hide_on_blur", True):
+            if self.isActiveWindow():
+                self._ever_active = True
+            elif self._ever_active and self.cfg.get("hide_on_blur", True):
                 self.hide()
         super().changeEvent(event)
 
