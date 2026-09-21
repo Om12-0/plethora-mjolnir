@@ -1,6 +1,6 @@
 """
 main.py - Plethora Mjolnir Application Entrypoint with Win32 Global Hotkey (Alt+Space).
-Enforces UAC administrator elevation so bundled Everything 1.4 can read NTFS USN journals.
+Runs as standard user (asInvoker); the Everything Windows Service indexes NTFS as SYSTEM.
 """
 
 import sys
@@ -74,11 +74,14 @@ def _app_icon_path():
     return None
 
 def main():
-    # 1. Enforce Admin Elevation First
-    if not is_admin():
-        elevate_and_restart()
+    # Standard user execution - no UAC gate needed
+    # The Everything Service runs in the background as SYSTEM to index NTFS MFT
+    try:
+        print(f"[DEBUG] Running as admin: {is_admin()}")
+    except Exception:
+        pass
 
-    # 2. Start Qt Application
+    # Start Qt Application
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 

@@ -41,7 +41,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='assets/icon.ico',
-    uac_admin=True,  # Embeds requireAdministrator in PE application manifest
+    uac_admin=False,  # Reverts to asInvoker
 )
 
 coll = COLLECT(

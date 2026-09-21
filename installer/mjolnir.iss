@@ -10,7 +10,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-DefaultDirName={localappdata}\Programs\{#MyAppName}
+DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 OutputBaseFilename=Plethora-Mjolnir-Setup-2.2.0
 OutputDir=..\dist-installer
@@ -32,4 +32,14 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFile
 Name: "{autostartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"
 
 [Run]
+; 1. Install & start the Everything Service as SYSTEM during installation
+Filename: "{app}\_internal\bin\Everything.exe"; Parameters: "-install-service"; Flags: runhidden waituntilterminated
+Filename: "{app}\_internal\bin\Everything.exe"; Parameters: "-start-service"; Flags: runhidden waituntilterminated
+
+; 2. Launch Mjolnir as standard user post-install
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall runascurrentuser skipifsilent
+
+[UninstallRun]
+; Stop & uninstall the service cleanly on uninstall
+Filename: "{app}\_internal\bin\Everything.exe"; Parameters: "-stop-service"; Flags: runhidden waituntilterminated
+Filename: "{app}\_internal\bin\Everything.exe"; Parameters: "-uninstall-service"; Flags: runhidden waituntilterminated
